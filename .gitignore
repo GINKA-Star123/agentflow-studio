@@ -1,0 +1,71 @@
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+*.swp
+*.swo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules
+vendor
+
+# Frontend / Next.js
+apps/web/.next
+apps/web/out
+apps/web/dist
+apps/web/coverage
+apps/web/.turbo
+
+# Go
+services/api/bin
+services/api/tmp
+services/api/dist
+services/api/coverage
+services/api/*.test
+services/api/*.out
+
+# Python
+services/ai-runtime/.venv
+services/ai-runtime/venv
+services/ai-runtime/__pycache__
+services/ai-runtime/.pytest_cache
+services/ai-runtime/.mypy_cache
+services/ai-runtime/.ruff_cache
+services/ai-runtime/.coverage
+services/ai-runtime/htmlcov
+*.pyc
+*.pyo
+*.pyd
+
+# Docker / local runtime data
+deployments/docker/data
+docker-compose.override.yml
+
+# Build outputs
+dist
+build
+coverage
+
+# Cache
+.cache
+.temp
+tmp
+temp
