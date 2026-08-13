@@ -28,6 +28,7 @@ import {
   StartNode,
 } from "@/components/workflow/nodes/basic-nodes";
 import { useWorkflowDesignerStore } from "@/stores/workflow-designer-store";
+import { useWorkflowStore } from "@/stores/workflow-store";
 import {
   WORKFLOW_NODE_DRAG_TYPE,
   isWorkflowNodeType,
@@ -65,6 +66,7 @@ function WorkflowCanvasInner() {
   const edges = useWorkflowDesignerStore((state) => state.edges);
   const selectedNodeId = useWorkflowDesignerStore((state) => state.selectedNodeId);
   const selectedEdgeId = useWorkflowDesignerStore((state) => state.selectedEdgeId);
+  const draftName = useWorkflowStore((state) => state.draftName);
   const onNodesChange = useWorkflowDesignerStore((state) => state.onNodesChange);
   const onEdgesChange = useWorkflowDesignerStore((state) => state.onEdgesChange);
   const connectNodes = useWorkflowDesignerStore((state) => state.connectNodes);
@@ -150,7 +152,7 @@ function WorkflowCanvasInner() {
       <div className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4">
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold text-slate-950">
-            未命名 Workflow
+            {draftName || "未命名 Workflow"}
           </h2>
           <p className="mt-0.5 text-xs text-slate-500">schema_version: 1.0</p>
         </div>

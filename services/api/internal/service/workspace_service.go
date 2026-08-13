@@ -423,6 +423,29 @@ func (s *WorkspaceService) RequireViewPermission(
 	return member, nil
 }
 
+// RequireEditablePermission 允许 Workflow 等业务资源由 member 及以上角色编辑。
+// viewer 保留只读权限，不允许创建或更新 Workflow。
+func (s *WorkspaceService) RequireEditablePermission(
+	ctx context.Context,
+	workspaceID uuid.UUID,
+	userID uuid.UUID,
+) (*model.WorkspaceMember, error) {
+	member, err := s.RequireMember(ctx, workspaceID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if member.Role == model.WorkspaceRoleViewer {
+		return nil, workspace.NewWorkspaceError(
+			workspace.ErrorCodePermissionDenied,
+			"viewer 没有编辑 Workflow 的权限",
+			workspace.ErrPermissionDenied,
+		)
+	}
+
+	return member, nil
+}
+
 func (s *WorkspaceService) ListMembers(
 	ctx context.Context,
 	input ListWorkspaceMembersInput,

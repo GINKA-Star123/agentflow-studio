@@ -119,6 +119,16 @@ func (e *LLMExecutor) Execute(
 		},
 	}
 
+	if response.HasToolCalls() {
+		toolCalls := response.AllToolCalls()
+		output["tool_calls"] = toolCalls
+		output["message"] = JSONMap{
+			"role":       "assistant",
+			"content":    responseText,
+			"tool_calls": toolCalls,
+		}
+	}
+
 	result := NewNodeExecutionResult(input.Node, output)
 	result.TokenUsage = &tokenUsage
 	result.Metadata = JSONMap{

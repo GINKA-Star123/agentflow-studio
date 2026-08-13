@@ -15,6 +15,9 @@ func NewRouter(
 	logger *zap.Logger,
 	authHandler *handler.AuthHandler,
 	workspaceHandler *handler.WorkspaceHandler,
+	workflowHandler *handler.WorkflowHandler,
+	workflowRunHandler *handler.WorkflowRunHandler,
+	llmStreamHandler *handler.LLMStreamHandler,
 	jwtManager *auth.JWTManager,
 ) *gin.Engine {
 	if cfg.AppEnv == "prod" {
@@ -58,6 +61,36 @@ func NewRouter(
 				workspaceGroup.POST("/:workspace_id/members", workspaceHandler.AddMember)
 				workspaceGroup.PATCH("/:workspace_id/members/:user_id/role", workspaceHandler.UpdateMemberRole)
 				workspaceGroup.DELETE("/:workspace_id/members/:user_id", workspaceHandler.RemoveMember)
+
+				workspaceGroup.GET("/:workspace_id/workflows", workflowHandler.List)
+				workspaceGroup.POST("/:workspace_id/workflows", workflowHandler.Create)
+				workspaceGroup.GET("/:workspace_id/workflows/:workflow_id", workflowHandler.Get)
+				workspaceGroup.PUT("/:workspace_id/workflows/:workflow_id", workflowHandler.Update)
+
+				workspaceGroup.POST(
+					"/:workspace_id/llm/stream",
+					llmStreamHandler.Stream,
+				)
+
+				workspaceGroup.POST(
+					"/:workspace_id/workflows/:workflow_id/runs",
+					workflowRunHandler.Start,
+				)
+
+				workspaceGroup.GET(
+					"/:workspace_id/workflow-runs/:run_id",
+					workflowRunHandler.Get,
+				)
+
+				workspaceGroup.GET(
+					"/:workspace_id/workflow-runs/:run_id/nodes",
+					workflowRunHandler.ListNodes,
+				)
+
+				workspaceGroup.POST(
+					"/:workspace_id/workflow-runs/:run_id/cancel",
+					workflowRunHandler.Cancel,
+				)
 			}
 		}
 	}

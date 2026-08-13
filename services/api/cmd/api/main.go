@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"agentflow-studio/services/api/internal/airuntime"
 	"agentflow-studio/services/api/internal/auth"
 	"agentflow-studio/services/api/internal/config"
 	appdb "agentflow-studio/services/api/internal/database"
@@ -16,6 +17,7 @@ import (
 	"agentflow-studio/services/api/internal/repository"
 	"agentflow-studio/services/api/internal/server"
 	"agentflow-studio/services/api/internal/service"
+	"agentflow-studio/services/api/internal/workflowruntime"
 
 	"go.uber.org/zap"
 )
@@ -58,6 +60,17 @@ func main() {
 
 	userRepo := repository.NewUserRepository(db)
 	workspaceRepo := repository.NewWorkspaceRepository(db)
+	workflowDefinitionRepo := repository.NewWorkflowDefinitionRepository(db)
+	workflowRunRepo := repository.NewWorkflowRunRepository(db)
+
+	aiRuntimeClient, err := airuntime.NewClient(airuntime.ClientConfig{
+		BaseURL: cfg.AIRuntimeURL,
+	})
+	if err != nil {
+		logger.Fatal("初始化 AI Runtime Client 失败", zap.Error(err))
+	}
+
+	executorRegistry := workflowruntime.NewPhase4ExecutorRegistry(aiRuntimeClient)
 
 	authService := service.NewAuthService(
 		db,
@@ -70,12 +83,42 @@ func main() {
 		userRepo,
 		workspaceRepo,
 	)
+	workflowRunnerService := service.NewWorkflowRunnerService(
+		workflowDefinitionRepo,
+		workflowRunRepo,
+		workspaceService,
+		executorRegistry,
+	)
+	workflowService := service.NewWorkflowService(
+		db,
+		workflowDefinitionRepo,
+		workspaceService,
+	)
+
+	llmStreamService := service.NewLLMStreamService(
+		aiRuntimeClient,
+		workspaceService,
+	)
 
 	authHandler := handler.NewAuthHandler(authService)
 
 	workspaceHandler := handler.NewWorkspaceHandler(workspaceService)
 
-	router := server.NewRouter(cfg, logger, authHandler, workspaceHandler, jwtManager)
+	workflowRunHandler := handler.NewWorkflowRunHandler(workflowRunnerService)
+	workflowHandler := handler.NewWorkflowHandler(workflowService)
+
+	llmStreamHandler := handler.NewLLMStreamHandler(llmStreamService)
+
+	router := server.NewRouter(
+		cfg,
+		logger,
+		authHandler,
+		workspaceHandler,
+		workflowHandler,
+		workflowRunHandler,
+		llmStreamHandler,
+		jwtManager,
+	)
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,

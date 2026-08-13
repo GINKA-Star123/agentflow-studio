@@ -97,36 +97,56 @@
 
 ## Phase 4：Workflow Engine
 
-- [ ] 定义 Workflow JSON Schema
-- [ ] 实现 Workflow DAG 校验
-- [ ] 实现节点执行器接口
-- [ ] 实现 Start 节点执行器
-- [ ] 实现 End 节点执行器
-- [ ] 实现 Prompt 节点执行器
-- [ ] 实现 LLM 节点执行器
-- [ ] 实现 Condition 节点执行器
-- [ ] 实现 Loop 节点执行器
-- [ ] 实现 HTTP 节点执行器
-- [ ] 实现 Tool 节点执行器
-- [ ] 实现 Memory 节点执行器
-- [ ] 实现 RAG 节点执行器
-- [ ] 实现 Run 状态记录
-- [ ] 实现 Node Execution 记录
-- [ ] 实现 WebSocket 事件推送
-- [ ] 补充 DAG 校验测试
-- [ ] 补充节点执行测试
+- [x] 定义 Workflow Schema Go 类型
+- [x] 实现 Workflow Schema JSON 解析
+- [x] 实现 Workflow DAG 校验
+- [x] 实现 Start / End 数量校验
+- [x] 实现节点 ID 唯一性校验
+- [x] 实现 Edge source / target 存在性校验
+- [x] 实现禁止 End 作为 source
+- [x] 实现禁止 Start 作为 target
+- [x] 实现自环与环检测
+- [x] 实现从 Start 可达性检查
+- [x] 实现 End 可达性检查
+- [x] 实现 NodeExecutor 接口
+- [x] 实现 ExecutionContext
+- [x] 实现 NodeExecutionResult
+- [x] 实现 ExecutorRegistry
+- [x] 实现 Start 节点执行器
+- [x] 实现 End 节点执行器
+- [x] 实现 Prompt 节点执行器
+- [x] 实现 AI Runtime Client 骨架
+- [x] 实现 LLM 节点执行器骨架
+- [x] 实现 Workflow Run 状态记录
+- [x] 实现 Node Execution 记录
+- [x] 实现 Workflow Runner Service 同步执行
+- [x] 实现 Workflow Run API
+- [x] 实现 RuntimeError 到 API 响应转换
+- [x] 实现前端 Designer Run 按钮
+- [x] 实现前端 Run 状态展示
+- [x] 实现前端节点执行列表展示
+- [x] 实现前端 LLM response_text 展示
+- [x] 实现前端 token_usage / latency_ms 展示
+
+> 说明：Condition / Loop / HTTP / Tool / Memory / RAG 节点执行器、WebSocket 事件推送、异步队列、流式输出和真实 Provider 接入不纳入 Phase 4 验收范围，进入 Phase 5 及后续阶段。
 
 ## Phase 5：LLM Runtime
 
-- [ ] 初始化 FastAPI 服务
-- [ ] 实现 OpenAI Compatible Provider
-- [ ] 实现 Chat API
-- [ ] 实现 Streaming API
-- [ ] 实现 Prompt 模板渲染
-- [ ] 实现 Tool Calling 数据结构
-- [ ] 实现 Token 用量统计
-- [ ] Go 服务接入 AI Runtime
-- [ ] 前端展示流式输出
+- [x] 初始化 FastAPI 服务
+- [x] 实现 OpenAI Compatible Provider
+- [x] 实现 Chat API
+- [x] 实现 Streaming API
+- [x] 实现 Prompt 模板渲染
+- [x] 实现 Tool Calling 数据结构
+- [x] 实现 Token 用量统计
+- [x] Go 服务接入 AI Runtime
+- [x] 前端展示流式输出
+
+### Phase 5 最终验证命令
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-phase5.ps1
+```
 
 ## Phase 6：Knowledge Base
 
@@ -188,11 +208,11 @@
 
 ## 当前优先级
 
-1. 开始 Phase 4：Workflow Engine / Runtime Execution
-2. 定义 Workflow JSON Schema
-3. 实现 Workflow DAG 校验
-4. 实现节点执行器接口
-5. 推进 Start / End / Prompt / LLM 节点执行器
+1. 开始 Phase 6：Knowledge Base
+2. 设计知识库表、文档表和 Chunk 表
+3. 实现文档上传、解析与 Chunk 切分
+4. 实现 Embedding API、Qdrant 写入与检索
+5. 实现 RAG 节点上下文组装与前端知识库管理页面
 
 ## Phase 4 进入条件
 
@@ -206,3 +226,23 @@
 - [x] 前端可访问后端健康状态
 - [x] Workflow Designer 页面可用
 - [x] 准备开始 Phase 4：Workflow Engine / Runtime Execution
+
+## Phase 5 进入条件（已满足）
+
+- [x] Phase 4 Runtime Execution 后端主链路完成
+- [x] Phase 4 Runtime Execution 前端运行入口完成
+- [x] Workflow Run API 已写入 `docs/API_DESIGN.md`
+- [x] Runtime 当前实现已写入 `docs/WORKFLOW_ENGINE.md`
+- [x] Phase 4 已完成项已在本文件中勾选
+- [x] 最终验证命令已整理
+- [x] AI Runtime `/internal/v1/llm/chat` 准备进入真实 Provider 接入
+- [x] Streaming、Tool Calling、事件推送进入 Phase 5 实现范围
+
+## Phase 6 进入条件
+
+- [x] Phase 5 核心链路已完成
+- [x] Phase 5 文档与验证命令已整理
+- [ ] Knowledge Base 表结构设计完成
+- [ ] 文档上传、解析、Chunk 切分方案完成
+- [ ] Embedding API 与 Qdrant 接入方案完成
+- [ ] RAG 节点上下文组装方案完成

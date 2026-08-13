@@ -35,6 +35,10 @@ export type WorkflowNodeConfig = {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  stop?: string;
   systemPrompt?: string;
 };
 
@@ -151,6 +155,10 @@ export function createDefaultWorkflowNodeConfig(
         model: "",
         temperature: 0.7,
         maxTokens: 1024,
+        topP: 1,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        stop: "",
         systemPrompt: "",
       };
 

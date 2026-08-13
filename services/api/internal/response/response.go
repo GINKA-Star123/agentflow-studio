@@ -3,6 +3,8 @@ package response
 import (
 	"agentflow-studio/services/api/internal/auth"
 	"agentflow-studio/services/api/internal/middleware"
+	workflowerrors "agentflow-studio/services/api/internal/workflow"
+	"agentflow-studio/services/api/internal/workflowruntime"
 	"agentflow-studio/services/api/internal/workspace"
 	"errors"
 	"net/http"
@@ -78,6 +80,16 @@ func FromError(c *gin.Context, err error) {
 		return
 	}
 
+	var workflowErr *workflowerrors.Error
+	if errors.As(err, &workflowErr) {
+		fromWorkflowError(c, workflowErr)
+		return
+	}
+	var runtimeErr *workflowruntime.RuntimeError
+	if errors.As(err, &runtimeErr) {
+		fromRuntimeError(c, runtimeErr)
+		return
+	}
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		Fail(
 			c,
@@ -96,6 +108,22 @@ func FromError(c *gin.Context, err error) {
 		"服务内部错误",
 		nil,
 	)
+}
+
+func fromWorkflowError(c *gin.Context, err *workflowerrors.Error) {
+	switch err.Code {
+	case workflowerrors.ErrorCodeInvalidInput:
+		Fail(c, http.StatusBadRequest, string(err.Code), err.Error(), nil)
+	case workflowerrors.ErrorCodeNotFound:
+		Fail(c, http.StatusNotFound, string(err.Code), err.Error(), nil)
+	case workflowerrors.ErrorCodePermissionDenied:
+		Fail(c, http.StatusForbidden, string(err.Code), err.Error(), nil)
+	case workflowerrors.ErrorCodeCreateFailed,
+		workflowerrors.ErrorCodeUpdateFailed:
+		Fail(c, http.StatusInternalServerError, string(err.Code), err.Error(), nil)
+	default:
+		Fail(c, http.StatusInternalServerError, "INTERNAL", "服务内部错误", nil)
+	}
 }
 
 func fromAuthError(c *gin.Context, err *auth.AuthError) {
@@ -210,6 +238,85 @@ func fromWorkspaceError(c *gin.Context, err *workspace.WorkspaceError) {
 			string(err.Code),
 			err.Error(),
 			nil,
+		)
+
+	default:
+		Fail(
+			c,
+			http.StatusInternalServerError,
+			"INTERNAL",
+			"服务内部错误",
+			nil,
+		)
+	}
+}
+
+func fromRuntimeError(c *gin.Context, err *workflowruntime.RuntimeError) {
+	switch err.Code {
+	case workflowruntime.ErrorCodeInvalidInput,
+		workflowruntime.ErrorCodeInvalidSchema,
+		workflowruntime.ErrorCodeInvalidDAG,
+		workflowruntime.ErrorCodeUnsupportedNodeType,
+		workflowruntime.ErrorCodeInvalidLLMConfig,
+		workflowruntime.ErrorCodePromptRenderFailed:
+		Fail(
+			c,
+			http.StatusBadRequest,
+			string(err.Code),
+			err.Error(),
+			err.Details,
+		)
+
+	case workflowruntime.ErrorCodeWorkflowNotFound,
+		workflowruntime.ErrorCodeRunNotFound:
+		Fail(
+			c,
+			http.StatusNotFound,
+			string(err.Code),
+			err.Error(),
+			err.Details,
+		)
+
+	case workflowruntime.ErrorCodePermissionDenied:
+		Fail(
+			c,
+			http.StatusForbidden,
+			string(err.Code),
+			err.Error(),
+			err.Details,
+		)
+
+	case workflowruntime.ErrorCodeRunAlreadyTerminal,
+		workflowruntime.ErrorCodeExecutorAlreadyRegistered:
+		Fail(
+			c,
+			http.StatusConflict,
+			string(err.Code),
+			err.Error(),
+			err.Details,
+		)
+
+	case workflowruntime.ErrorCodeAIRuntimeError:
+		Fail(
+			c,
+			http.StatusBadGateway,
+			string(err.Code),
+			err.Error(),
+			err.Details,
+		)
+
+	case workflowruntime.ErrorCodeExecutorNotFound,
+		workflowruntime.ErrorCodeInvalidExecutionContext,
+		workflowruntime.ErrorCodeCreateRunFailed,
+		workflowruntime.ErrorCodeUpdateRunFailed,
+		workflowruntime.ErrorCodeNodeExecutionFailed,
+		workflowruntime.ErrorCodeCancelFailed:
+		Fail(
+			c,
+			http.StatusInternalServerError,
+			string(err.Code),
+			err.Error(),
+			err.Details,
 		)
 
 	default:

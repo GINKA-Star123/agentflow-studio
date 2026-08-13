@@ -131,11 +131,17 @@ func (r *ExecutorRegistry) ValidateNode(node WorkflowSchemaNode) error {
 	if err := executor.Validate(node.Config); err != nil {
 		return NewRuntimeErrorWithDetails(
 			ErrorCodeInvalidInput,
-			"节点配置校验失败",
+			fmt.Sprintf(
+				"节点 %s（%s）配置校验失败：%s",
+				node.ID,
+				node.Type.String(),
+				err.Error(),
+			),
 			err,
 			map[string]any{
 				"node_id":   node.ID,
 				"node_type": node.Type.String(),
+				"reason":    err.Error(),
 			},
 		)
 	}
@@ -189,11 +195,17 @@ func (r *ExecutorRegistry) ExecuteNode(
 	if err := executor.Validate(input.Config()); err != nil {
 		return nil, NewRuntimeErrorWithDetails(
 			ErrorCodeInvalidInput,
-			"节点配置校验失败",
+			fmt.Sprintf(
+				"节点 %s（%s）配置校验失败：%s",
+				input.Node.ID,
+				input.Node.Type.String(),
+				err.Error(),
+			),
 			err,
 			map[string]any{
 				"node_id":   input.Node.ID,
 				"node_type": input.Node.Type.String(),
+				"reason":    err.Error(),
 			},
 		)
 	}

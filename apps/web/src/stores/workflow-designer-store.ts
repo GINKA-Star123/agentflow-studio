@@ -20,6 +20,7 @@ import {
   type WorkflowNodeTemplate,
   type WorkflowNodeType,
 } from "@/types/workflow";
+import type { WorkflowSchema } from "@/lib/workflow-schema";
 
 type WorkflowDesignerState = {
   nodes: WorkflowDesignerNode[];
@@ -43,6 +44,7 @@ type WorkflowDesignerState = {
     patch: Partial<Pick<WorkflowNodeData, "label" | "description">>,
   ) => void;
   updateNodeConfig: (nodeId: string, patch: Partial<WorkflowNodeConfig>) => void;
+  loadFromSchema: (schema: WorkflowSchema) => void;
   resetDesigner: () => void;
 };
 
@@ -287,6 +289,42 @@ export const useWorkflowDesignerStore = create<WorkflowDesignerState>(
             : node,
         ),
       }));
+    },
+
+    loadFromSchema(schema) {
+      const nodes = schema.nodes.map((node) => ({
+        id: node.id,
+        type: getWorkflowNodeRenderType(node.type),
+        position: node.position,
+        data: {
+          nodeType: node.type,
+          label: node.label,
+          description: node.description,
+          config: {
+            ...createDefaultWorkflowNodeConfig(node.type),
+            ...(node.config ?? {}),
+          },
+        },
+      })) satisfies WorkflowDesignerNode[];
+
+      const edges = schema.edges.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        sourceHandle: edge.sourceHandle ?? null,
+        target: edge.target,
+        targetHandle: edge.targetHandle ?? null,
+        type: edge.type ?? "smoothstep",
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+        },
+      })) satisfies WorkflowDesignerEdge[];
+
+      set({
+        nodes,
+        edges,
+        selectedNodeId: null,
+        selectedEdgeId: null,
+      });
     },
 
     resetDesigner() {

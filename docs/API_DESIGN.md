@@ -68,6 +68,23 @@
 | WORKFLOW_NOT_FOUND | Workflow 不存在 |
 | WORKFLOW_CREATE_FAILED | Workflow 创建失败 |
 | WORKFLOW_UPDATE_FAILED | Workflow 更新失败 |
+| RUNTIME_INVALID_INPUT | Runtime 参数错误 |
+| RUNTIME_INVALID_SCHEMA | Runtime Schema 错误 |
+| RUNTIME_UNSUPPORTED_NODE_TYPE | 不支持的 Runtime 节点类型 |
+| RUNTIME_WORKFLOW_NOT_FOUND | 可执行 Workflow 不存在 |
+| RUNTIME_RUN_NOT_FOUND | Workflow Run 不存在 |
+| RUNTIME_PERMISSION_DENIED | Runtime 权限不足 |
+| RUNTIME_INVALID_DAG | Workflow DAG 校验失败 |
+| RUNTIME_CREATE_RUN_FAILED | Workflow Run 创建失败 |
+| RUNTIME_UPDATE_RUN_FAILED | Workflow Run 更新失败 |
+| RUNTIME_NODE_EXECUTION_FAILED | 节点执行失败 |
+| RUNTIME_RUN_ALREADY_TERMINAL | Workflow Run 已处于终态 |
+| RUNTIME_CANCEL_FAILED | Workflow Run 取消失败 |
+| RUNTIME_INVALID_EXECUTION_CONTEXT | Runtime 执行上下文错误 |
+| RUNTIME_EXECUTOR_NOT_FOUND | 节点执行器不存在 |
+| RUNTIME_EXECUTOR_ALREADY_REGISTERED | 节点执行器重复注册 |
+| RUNTIME_PROMPT_RENDER_FAILED | Prompt 渲染失败 |
+| RUNTIME_INVALID_LLM_CONFIG | LLM 节点配置错误 |
 
 ## Auth API
 
@@ -758,9 +775,23 @@ Response：
 
 ## Workflow Run API
 
+Workflow Run API 全部为受保护接口，必须携带 Bearer Token，并且必须属于目标 Workspace。
+
+当前 Phase 4 已实现同步执行版本：
+- owner / admin / member 可以发起和取消 Workflow Run
+- viewer 可以查看 Run 详情和节点执行记录
+- viewer 不能发起和取消 Workflow Run
+- WebSocket 事件推送、异步队列、流式输出留到 Phase 5 后续阶段
+
 ### POST /api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/runs
 
-执行 Workflow。
+发起并同步执行 Workflow。
+
+权限：
+- owner：允许
+- admin：允许
+- member：允许
+- viewer：不允许
 
 Request：
 
@@ -769,7 +800,7 @@ Request：
   "input": {
     "message": "hello"
   },
-  "version_id": "uuid"
+  "trace_id": "trace_demo_001"
 }
 ```
 
@@ -778,28 +809,188 @@ Response：
 ```json
 {
   "data": {
-    "run_id": "uuid",
-    "status": "pending"
+    "id": "uuid",
+    "workspace_id": "uuid",
+    "workflow_id": "uuid",
+    "status": "succeeded",
+    "output": {
+      "output": {
+        "response_text": "模型输出内容",
+        "text": "模型输出内容"
+      },
+      "inbound_outputs": [
+        {
+          "node_id": "llm_1",
+          "node_type": "LLM",
+          "output": {
+            "response_text": "模型输出内容"
+          }
+        }
+      ],
+      "variables": {}
+    },
+    "started_at": "2026-08-01T00:00:00Z",
+    "finished_at": "2026-08-01T00:00:03Z"
   },
   "request_id": "req_xxx"
 }
 ```
 
+可能错误：
+- `RUNTIME_WORKFLOW_NOT_FOUND`：Workflow 不存在或已删除
+- `RUNTIME_INVALID_SCHEMA`：Workflow Schema 无法解析
+- `RUNTIME_INVALID_DAG`：DAG 校验失败
+- `RUNTIME_EXECUTOR_NOT_FOUND`：节点执行器不存在
+- `RUNTIME_UNSUPPORTED_NODE_TYPE`：当前阶段暂不支持执行该节点类型
+- `RUNTIME_PROMPT_RENDER_FAILED`：Prompt 模板解析或渲染失败
+- `RUNTIME_INVALID_LLM_CONFIG`：LLM 配置错误
+- `AI_RUNTIME_ERROR`：AI Runtime 调用失败
+- `RUNTIME_PERMISSION_DENIED`：当前用户无权执行
+
 ### GET /api/v1/workspaces/{workspace_id}/workflow-runs/{run_id}
 
 获取执行详情。
+
+权限：
+- owner：允许
+- admin：允许
+- member：允许
+- viewer：允许
+
+Response：
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "workspace_id": "uuid",
+    "workflow_id": "uuid",
+    "triggered_by": "uuid",
+    "status": "succeeded",
+    "input": {
+      "message": "hello"
+    },
+    "output": {
+      "output": {
+        "response_text": "模型输出内容"
+      }
+    },
+    "error": null,
+    "started_at": "2026-08-01T00:00:00Z",
+    "finished_at": "2026-08-01T00:00:03Z",
+    "created_at": "2026-08-01T00:00:00Z",
+    "updated_at": "2026-08-01T00:00:03Z"
+  },
+  "request_id": "req_xxx"
+}
+```
+
+可能错误：
+- `RUNTIME_RUN_NOT_FOUND`：Run 不存在
+- `WORKSPACE_PERMISSION_DENIED`：当前用户无权查看目标 Workspace
 
 ### GET /api/v1/workspaces/{workspace_id}/workflow-runs/{run_id}/nodes
 
 获取节点执行列表。
 
+权限：
+- owner：允许
+- admin：允许
+- member：允许
+- viewer：允许
+
+Response：
+
+```json
+{
+  "data": {
+    "items": [
+      {
+        "id": "uuid",
+        "workspace_id": "uuid",
+        "run_id": "uuid",
+        "node_id": "llm_1",
+        "node_type": "LLM",
+        "sequence": 0,
+        "status": "succeeded",
+        "input": {
+          "prompt": "请总结这段内容"
+        },
+        "output": {
+          "response_text": "模型输出内容",
+          "text": "模型输出内容",
+          "message": {
+            "role": "assistant",
+            "content": "模型输出内容"
+          }
+        },
+        "error": null,
+        "token_usage": {
+          "provider": "openai",
+          "model": "gpt-4.1-mini",
+          "input_tokens": 100,
+          "output_tokens": 50,
+          "total_tokens": 150
+        },
+        "latency_ms": 1234,
+        "started_at": "2026-08-01T00:00:01Z",
+        "finished_at": "2026-08-01T00:00:03Z",
+        "created_at": "2026-08-01T00:00:01Z",
+        "updated_at": "2026-08-01T00:00:03Z"
+      }
+    ]
+  },
+  "request_id": "req_xxx"
+}
+```
+
+如果 LLM 节点触发 `tool_calls`，则 `output` 中还会附带 `tool_calls`、`tool_bridge` 和 `tool_messages` 三个字段。其中 `tool_bridge` 是 Go Workflow 当前的 mock 工具桥接结果，`tool_messages` 是后续多轮执行预留的 `tool` role 消息列表。
+
 ### POST /api/v1/workspaces/{workspace_id}/workflow-runs/{run_id}/cancel
 
 取消执行。
 
+权限：
+- owner：允许
+- admin：允许
+- member：允许
+- viewer：不允许
+
+当前 Phase 4 Runner 仍为同步执行，因此大多数 Run 在接口返回时已经进入 `succeeded` 或 `failed` 终态。取消接口主要为 Phase 5 的异步执行与事件推送预留。
+
+Response：
+
+```json
+{
+  "data": {
+    "canceled": true,
+    "run": {
+      "id": "uuid",
+      "workspace_id": "uuid",
+      "workflow_id": "uuid",
+      "triggered_by": "uuid",
+      "status": "canceled",
+      "error": {
+        "code": "RUNTIME_CANCELED",
+        "message": "Workflow Run 已取消"
+      },
+      "finished_at": "2026-08-01T00:00:05Z"
+    }
+  },
+  "request_id": "req_xxx"
+}
+```
+
+可能错误：
+- `RUNTIME_RUN_ALREADY_TERMINAL`：Run 已经成功、失败或取消
+- `RUNTIME_CANCEL_FAILED`：取消状态写入失败
+- `RUNTIME_PERMISSION_DENIED`：当前用户无权取消
+
 ### GET /api/v1/workspaces/{workspace_id}/workflow-runs/{run_id}/events
 
 WebSocket 连接，用于接收执行事件。
+
+当前 Phase 4 未实现该接口，仅作为 Phase 5 Streaming / Events 的 API 预留。Phase 5 接入异步 Runner、Redis Pub/Sub 或事件总线后，再开放该接口给前端实时订阅。
 
 事件格式：
 
@@ -861,11 +1052,123 @@ Request：
 
 ### POST /internal/v1/llm/chat
 
-LLM Chat 调用。
+单次同步 LLM Chat 调用。
+
+Request：
+
+```json
+{
+  "provider": "openai-compatible",
+  "model": "gpt-4.1-mini",
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are a helpful assistant."
+    },
+    {
+      "role": "user",
+      "content": "Hello"
+    }
+  ],
+  "temperature": 0.7,
+  "max_tokens": 1024,
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "search_docs",
+        "description": "Search documentation",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": ["query"]
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto",
+  "metadata": {
+    "trace_id": "trace_xxx",
+    "run_id": "run_xxx",
+    "node_id": "llm_1"
+  }
+}
+```
+
+Response：
+
+```json
+{
+  "data": {
+    "text": "模型输出内容",
+    "message": {
+      "role": "assistant",
+      "content": "模型输出内容",
+      "tool_calls": [
+        {
+          "id": "call_1",
+          "type": "function",
+          "function": {
+            "name": "search_docs",
+            "arguments": "{\"query\":\"hello\"}"
+          }
+        }
+      ]
+    },
+    "tool_calls": [
+      {
+        "id": "call_1",
+        "type": "function",
+        "function": {
+          "name": "search_docs",
+          "arguments": "{\"query\":\"hello\"}"
+        }
+      }
+    ],
+    "token_usage": {
+      "input_tokens": 100,
+      "output_tokens": 50,
+      "total_tokens": 150
+    },
+    "raw": {
+      "provider": "openai-compatible",
+      "model": "gpt-4.1-mini",
+      "latency_ms": 123
+    }
+  },
+  "request_id": "req_xxx"
+}
+```
+
+说明：
+
+- 当模型返回工具调用时，`message.tool_calls` 与 `tool_calls` 会同时保留。
+- `token_usage` 会在 AI Runtime 与 Go API 两侧统一归一化。
+- `raw` 保留 provider 原始元数据，便于调试和追踪。
 
 ### POST /internal/v1/llm/stream
 
-LLM 流式调用。
+LLM 流式调用，响应类型为 `text/event-stream`。
+
+事件类型：
+
+- `start`
+- `delta`
+- `tool_call_delta`
+- `usage`
+- `done`
+- `error`
+
+说明：
+
+- `delta` 用于累计输出文本。
+- `tool_call_delta` 用于逐段返回工具调用信息。
+- `usage` 用于返回 token usage。
+- `done` 用于返回最终文本、完整 `tool_calls` 和结束原因。
 
 ### POST /internal/v1/embeddings
 
@@ -877,7 +1180,29 @@ RAG 查询。
 
 ### POST /internal/v1/tools/call
 
-Tool Calling。
+Tool Calling 协议预留。
+
+Request：
+
+```json
+{
+  "tool_call_id": "call_1",
+  "tool_name": "search_docs",
+  "arguments": {
+    "query": "hello"
+  },
+  "workspace_id": "uuid",
+  "workflow_id": "uuid",
+  "run_id": "uuid",
+  "node_id": "tool_1",
+  "timeout_ms": 30000,
+  "metadata": {
+    "trace_id": "trace_xxx"
+  }
+}
+```
+
+当前实现返回 `501`，错误码为 `AI_RUNTIME_TOOL_EXECUTION_NOT_IMPLEMENTED`。协议已定义，用于后续真实工具执行、MCP 集成和多轮 Tool Calling 闭环。
 
 ## 健康检查
 

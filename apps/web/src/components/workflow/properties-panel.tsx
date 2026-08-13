@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  useEffect,
   useMemo,
   useState,
 } from "react"
@@ -36,12 +35,14 @@ import {
   type WorkflowValidationResult,
 } from "@/lib/workflow-schema"
 import { useWorkflowDesignerStore } from "@/stores/workflow-designer-store"
+import { useWorkflowStore } from "@/stores/workflow-store"
 
 export function PropertiesPanel() {
   const nodes = useWorkflowDesignerStore((state) => state.nodes)
   const edges = useWorkflowDesignerStore((state) => state.edges)
   const selectedNodeId = useWorkflowDesignerStore((state) => state.selectedNodeId)
   const selectedEdgeId = useWorkflowDesignerStore((state) => state.selectedEdgeId)
+  const draftName = useWorkflowStore((state) => state.draftName)
   const deleteNode = useWorkflowDesignerStore((state) => state.deleteNode)
   const deleteEdge = useWorkflowDesignerStore((state) => state.deleteEdge)
   const updateNodeData = useWorkflowDesignerStore((state) => state.updateNodeData)
@@ -52,20 +53,17 @@ export function PropertiesPanel() {
   const schema = useMemo(
     () =>
       buildWorkflowSchema({
-        name: DEFAULT_WORKFLOW_NAME,
+        name: draftName || DEFAULT_WORKFLOW_NAME,
         nodes,
         edges,
       }),
-    [nodes, edges],
+    [draftName, nodes, edges],
   )
 
   const validation = useMemo(() => validateWorkflowSchema(schema), [schema])
   const schemaJson = useMemo(() => formatWorkflowSchema(schema), [schema])
-  const [copied, setCopied] = useState(false)
-
-  useEffect(() => {
-    setCopied(false)
-  }, [schemaJson])
+  const [copiedSchema, setCopiedSchema] = useState("")
+  const copied = copiedSchema === schemaJson
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId) ?? null
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId) ?? null
@@ -73,9 +71,9 @@ export function PropertiesPanel() {
   async function handleCopySchema() {
     try {
       await navigator.clipboard.writeText(schemaJson)
-      setCopied(true)
+      setCopiedSchema(schemaJson)
     } catch {
-      setCopied(false)
+      setCopiedSchema("")
     }
   }
 

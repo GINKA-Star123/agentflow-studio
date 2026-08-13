@@ -43,7 +43,7 @@ type NodeExecution struct {
 }
 
 func (NodeExecution) TableName() string {
-	return "node_execution"
+	return "node_executions"
 }
 
 func (s NodeExecutionStatus) IsTerminal() bool {

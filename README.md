@@ -2,7 +2,7 @@
 
 AgentFlow Studio 是一个面向 AI Agent 的生产级可视化 Workflow 编排平台。
 
-当前阶段：Phase 3 Workflow Designer 已完成，准备进入 Phase 4 Runtime Execution。
+当前阶段：Phase 5 AI Runtime / Tools / Streaming 已完成，准备进入 Phase 6 Knowledge Base。
 
 Phase 1 的目标是完成基础工程、基础服务、Docker 编排、健康检查和本地开发流程，为后续用户系统、Workflow Designer、Workflow Engine、AI Runtime、RAG、Redis、OpenTelemetry、MCP 等阶段打基础。
 
@@ -879,9 +879,262 @@ Invoke-RestMethod `
 - [x] `docs/TODO.md` 已标记 Phase 3 完成
 - [x] 准备开始 Workflow Engine / Runtime Execution
 
-## 14. 常见问题
+## 14. Phase 4 Runtime Execution 启动与验证
 
-### 14.1 PowerShell 无法执行脚本
+Phase 4 已完成 Workflow Runtime Execution 的第一版闭环，当前支持：
+
+- Workflow Run 数据表与节点执行记录表
+- Workflow Schema Go 类型与 JSON 解析
+- Workflow DAG 校验
+- Start / End / Prompt / LLM 节点执行器
+- AI Runtime Client 骨架
+- Workflow Runner Service 同步执行
+- Workflow Run API
+- 前端 Designer 运行入口
+- Run 状态、节点执行列表、LLM 输出、token usage、latency 展示
+
+### 14.1 本地启动顺序
+
+1. 启动基础依赖：
+
+```powershell
+.\scripts\dev-deps.ps1
+```
+
+2. 执行数据库迁移：
+
+```powershell
+Get-Content -Raw services\api\migrations\000001_create_auth_workspace_tables.up.sql |
+docker exec -i agentflow-postgres psql -U agentflow -d agentflow
+
+Get-Content -Raw services\api\migrations\000002_create_workflows_tables.up.sql |
+docker exec -i agentflow-postgres psql -U agentflow -d agentflow
+
+Get-Content -Raw services\api\migrations\000003_create_workflow_runtime_tables.up.sql |
+docker exec -i agentflow-postgres psql -U agentflow -d agentflow
+```
+
+3. 启动 AI Runtime：
+
+```powershell
+cd services\ai-runtime
+.\.venv\Scripts\Activate.ps1
+uvicorn app.main:app --host 0.0.0.0 --port 8090 --reload
+```
+
+4. 启动 Go API：
+
+```powershell
+cd services\api
+go run .\cmd\api
+```
+
+5. 启动 Web 前端：
+
+```powershell
+cd apps\web
+npm run dev
+```
+
+### 14.2 Phase 4 API 快速验证
+
+发起 Workflow Run：
+
+```powershell
+$runBody = @{
+  input = @{
+    message = "hello from phase 4"
+  }
+  trace_id = "trace_phase4_manual"
+} | ConvertTo-Json -Depth 10
+
+$runResult = Invoke-RestMethod `
+  -Method POST `
+  -Uri "http://localhost:8080/api/v1/workspaces/<workspace_id>/workflows/<workflow_id>/runs" `
+  -Headers @{ Authorization = "Bearer <access_token>" } `
+  -ContentType "application/json" `
+  -Body $runBody
+
+$runID = $runResult.data.id
+```
+
+查询 Run 详情：
+
+```powershell
+Invoke-RestMethod `
+  -Method GET `
+  -Uri "http://localhost:8080/api/v1/workspaces/<workspace_id>/workflow-runs/$runID" `
+  -Headers @{ Authorization = "Bearer <access_token>" }
+```
+
+查询节点执行记录：
+
+```powershell
+Invoke-RestMethod `
+  -Method GET `
+  -Uri "http://localhost:8080/api/v1/workspaces/<workspace_id>/workflow-runs/$runID/nodes" `
+  -Headers @{ Authorization = "Bearer <access_token>" }
+```
+
+取消 Run：
+
+```powershell
+Invoke-RestMethod `
+  -Method POST `
+  -Uri "http://localhost:8080/api/v1/workspaces/<workspace_id>/workflow-runs/$runID/cancel" `
+  -Headers @{ Authorization = "Bearer <access_token>" }
+```
+
+### 14.3 前端验证入口
+
+保存 Workflow 后，进入 Designer 页面时带上 Workflow ID：
+
+```text
+http://localhost:3000/dashboard/workflows?workflowId=<workflow_id>
+```
+
+在 Designer 中可以：
+
+- 输入 Run input JSON
+- 点击运行
+- 查看 Run 状态
+- 查看节点执行列表
+- 查看 LLM `response_text`
+- 查看 `token_usage`
+- 查看 `latency_ms`
+
+### 14.4 Phase 4 最终验收清单
+
+- [x] `workflow_runs` 表已创建
+- [x] `node_executions` 表已创建
+- [x] Workflow Schema Go 类型已实现
+- [x] Workflow Schema JSON 解析已实现
+- [x] Workflow DAG 校验已实现
+- [x] NodeExecutor 接口已实现
+- [x] ExecutionContext 已实现
+- [x] ExecutorRegistry 已实现
+- [x] Start Executor 已实现
+- [x] End Executor 已实现
+- [x] Prompt Executor 已实现
+- [x] AI Runtime Client 已实现
+- [x] LLM Executor 骨架已实现
+- [x] Workflow Runner Service 已实现
+- [x] Run 状态持久化已实现
+- [x] Node Execution 持久化已实现
+- [x] Workflow Run API 已实现
+- [x] RuntimeError 到 API 响应转换已实现
+- [x] 前端 Run 按钮已实现
+- [x] 前端 Run 状态展示已实现
+- [x] 前端节点执行列表展示已实现
+- [x] 前端 LLM 输出、token usage、latency 展示已实现
+
+### 14.5 Phase 5 AI Runtime / Tools / Streaming 进入条件（已满足）
+
+- [x] Phase 4 Runtime Execution 后端主链路完成
+- [x] Phase 4 Runtime Execution 前端运行入口完成
+- [x] Workflow Run API 已写入 `docs/API_DESIGN.md`
+- [x] Runtime 当前实现已写入 `docs/WORKFLOW_ENGINE.md`
+- [x] Phase 4 TODO 已勾选
+- [x] 最终验证命令已整理
+- [x] AI Runtime `/internal/v1/llm/chat` 已准备进入真实 Provider 接入
+- [x] Streaming、Tool Calling、事件推送进入 Phase 5 实现范围
+
+### 14.6 Phase 4 当前边界
+
+Phase 4 的目标是打通 Runtime Execution 第一版闭环，而不是完成完整生产级执行系统。当前边界如下：
+
+- Runner 当前为同步执行，API 请求会等待本次 Workflow 执行完成或失败。
+- Workflow Run 已持久化到 `workflow_runs`，节点执行已持久化到 `node_executions`。
+- 当前可执行节点为 Start / End / Prompt / LLM。
+- LLM 节点已通过 Go API 的 AI Runtime Client 调用 `/internal/v1/llm/chat`，真实 Provider、流式输出和 Tool Calling 进入 Phase 5。
+- Cancel API 已提供，但同步 Runner 下主要用于后续异步执行预留。
+- WebSocket 事件推送、Redis Pub/Sub、异步队列、运行中取消和实时前端事件流进入 Phase 5 及后续阶段。
+
+## 15. Phase 5 AI Runtime / Tools / Streaming 启动与验证
+
+Phase 5 已完成当前版本的 AI Runtime 闭环能力，包含：
+
+- FastAPI AI Runtime 服务
+- OpenAI Compatible Provider
+- `POST /internal/v1/llm/chat`
+- `POST /internal/v1/llm/stream`
+- Tool Calling 数据结构与 `tool` role message
+- Go Workflow Tool bridge 与 mock tool executor
+- 前端流式输出面板
+- Phase 5 验证脚本
+
+### 15.1 本地启动顺序
+
+1. 启动基础依赖：
+
+```powershell
+.\scripts\dev-deps.ps1
+```
+
+2. 启动 AI Runtime：
+
+```powershell
+cd services\ai-runtime
+.\.venv\Scripts\Activate.ps1
+uvicorn app.main:app --host 0.0.0.0 --port 8090 --reload
+```
+
+3. 启动 Go API：
+
+```powershell
+cd services\api
+go run .\cmd\api
+```
+
+4. 启动 Web 前端：
+
+```powershell
+cd apps\web
+npm run dev
+```
+
+### 15.2 Phase 5 验证命令
+
+推荐执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-phase5.ps1
+```
+
+单项验证：
+
+```powershell
+cd services\api
+go test ./internal/workflowruntime ./internal/service
+
+cd services\ai-runtime
+.\.venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
+```
+
+### 15.3 Phase 5 最终验收清单
+
+- [x] AI Runtime FastAPI 服务已启动
+- [x] OpenAI Compatible Provider 已注册
+- [x] `POST /internal/v1/llm/chat` 已返回 `response_text`、`message`、`tool_calls`、`token_usage`
+- [x] `POST /internal/v1/llm/stream` 已返回 `start`、`delta`、`tool_call_delta`、`usage`、`done` 事件
+- [x] Tool Calling 数据结构与 `tool` role message 已定义
+- [x] Go Workflow Tool bridge 已接入
+- [x] `tool_calls` 已在 LLM 节点输出中保留
+- [x] 前端流式输出面板已接入
+- [x] `scripts/verify-phase5.ps1` 已补充
+
+### 15.4 Phase 6 Knowledge Base 进入条件
+
+- [x] Phase 5 核心链路已完成
+- [x] Phase 5 文档与验证脚本已整理
+- [ ] Knowledge Base 表结构设计完成
+- [ ] 文档上传、解析、Chunk 切分方案完成
+- [ ] Embedding API 与 Qdrant 接入方案完成
+- [ ] RAG 节点上下文组装方案完成
+
+## 16. 常见问题
+
+### 16.1 PowerShell 无法执行脚本
 
 执行：
 
@@ -889,7 +1142,7 @@ Invoke-RestMethod `
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
-### 14.2 端口被占用
+### 16.2 端口被占用
 
 检查端口：
 
@@ -914,7 +1167,7 @@ netstat -ano | findstr :8090
 80：Nginx
 ```
 
-### 14.3 Docker 服务启动失败
+### 16.3 Docker 服务启动失败
 
 查看服务状态：
 
@@ -934,7 +1187,7 @@ docker compose -f deployments\docker\docker-compose.yml ps
 docker compose -f deployments\docker\docker-compose.yml up --build -d
 ```
 
-### 14.4 前端健康页显示后端异常
+### 16.4 前端健康页显示后端异常
 
 需要确认 Go API 和 AI Runtime 已启动：
 
@@ -950,7 +1203,7 @@ API_BASE_URL
 AI_RUNTIME_BASE_URL
 ```
 
-### 14.5 Phase 2 验证脚本失败
+### 16.5 Phase 2 验证脚本失败
 
 先确认 API 已启动：
 

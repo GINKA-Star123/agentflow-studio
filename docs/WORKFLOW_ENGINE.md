@@ -286,5 +286,98 @@ type NodeExecutor interface {
 - 每个 Workflow Run 创建根 Span
 - 每个节点执行创建子 Span
 - Span 属性包含 workflow_id、run_id、node_id、node_type
-- LLM 节点必须记录 provider、model、input_tokens、output_tokens
+- LLM 节点必须记录 provider、model、input_tokens、output_tokens、latency_ms，并在触发 Tool Calling 时保留 tool_call_id
 - HTTP 和 Tool 节点必须记录目标、状态码和耗时
+
+## Runtime Execution 当前实现（Phase 5）
+
+Phase 5 在 Phase 4 的同步 Workflow Runtime 基础上，补齐了 AI Runtime、Streaming、Tool Calling 协议和工具桥接预留。当前实现依然以同步 Runner 为主，但 LLM 节点已经能够把 `tool_calls` 透传到 Go Workflow，并生成 `tool` role message 预留后续多轮执行。
+
+### 已实现能力
+
+- Workflow Run 数据表：`workflow_runs`
+- 节点执行记录表：`node_executions`
+- Workflow Schema Go 类型与 JSON 解析
+- Workflow DAG 校验
+- NodeExecutor 接口
+- ExecutionContext 执行上下文
+- NodeExecutionResult 标准节点输出
+- ExecutorRegistry 执行器注册表
+- Start / End / Prompt / LLM 节点执行器
+- AI Runtime Client 骨架
+- AI Runtime OpenAI Compatible Provider 与 Streaming 支持
+- Workflow Runner Service 同步执行
+- Workflow Tool bridge 与 mock tool executor
+- Workflow Run API
+- RuntimeError 到统一 API 响应转换
+- 前端 Designer Run 按钮
+- 前端 Run 状态、节点执行列表、LLM 输出、token usage、latency 展示
+- Phase 5 验证脚本
+
+### 当前执行流程
+
+```text
+Load Workflow
+  -> Parse Workflow Schema
+  -> Create Workflow Run
+  -> Validate DAG
+  -> Validate Node Executors
+  -> Mark Run Running
+  -> Create Execution Context
+  -> Build Topological Execution Order
+  -> Execute Start Node
+  -> Persist Start Node Execution
+  -> Execute Prompt Node
+  -> Persist Prompt Node Execution
+  -> Execute LLM Node
+  -> Persist LLM Node Execution
+  -> If tool_calls exist, build tool bridge and tool messages
+  -> Execute End Node
+  -> Persist End Node Execution
+  -> Mark Run Succeeded / Failed
+```
+
+### 当前节点执行范围
+
+| 节点类型 | 当前状态 | 说明 |
+| --- | --- | --- |
+| Start | 已实现 | 读取 Run input，初始化输出 |
+| Prompt | 已实现 | 使用 `text/template` 渲染 `promptTemplate` |
+| LLM | 已实现 | 调用 AI Runtime Chat / Stream，保存 `response_text`、`token_usage`、`latency_ms` 和 `tool_calls` |
+| End | 已实现 | 汇总上游输出作为 Workflow output |
+| Tool | 已实现（桥接 / Mock） | 从 LLM `tool_calls` 生成 `ToolCallRequest`、mock 结果与 `tool` role message |
+| Condition | 预留 | 后续实现分支控制 |
+| Loop | 预留 | 后续实现循环控制 |
+| HTTP | 预留 | 后续实现外部 HTTP 调用 |
+| Memory | 预留 | 后续接入记忆读写 |
+| RAG | 预留 | 后续接入知识库检索 |
+
+### 当前 API 范围
+
+- `POST /api/v1/workspaces/{workspace_id}/workflows/{workflow_id}/runs`
+- `GET /api/v1/workspaces/{workspace_id}/workflow-runs/{run_id}`
+- `GET /api/v1/workspaces/{workspace_id}/workflow-runs/{run_id}/nodes`
+- `POST /api/v1/workspaces/{workspace_id}/workflow-runs/{run_id}/cancel`
+
+当前 Runner 是同步执行版本。发起 Run 的接口会等待执行完成或失败后返回。Cancel API 已提供，但在同步 Runner 下主要用于后续异步执行预留。
+
+### 当前权限规则
+
+- owner / admin / member 可以发起 Workflow Run。
+- owner / admin / member 可以取消未终态 Run。
+- viewer 可以查看 Run 详情和节点执行记录。
+- viewer 不能发起或取消 Workflow Run。
+
+### Phase 4 边界
+
+以下能力不纳入 Phase 4 验收范围，进入 Phase 5 及后续阶段：
+
+- AI Runtime 真实 Provider 接入
+- LLM Streaming
+- Tool Calling
+- WebSocket 执行事件推送
+- Redis Pub/Sub 事件分发
+- 异步 Runner
+- 运行中取消正在执行的节点
+- Condition / Loop / HTTP / Tool / Memory / RAG 节点执行器
+- OpenTelemetry Span 与 Prometheus Metrics

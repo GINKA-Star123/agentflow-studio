@@ -87,8 +87,8 @@ func (c *Client) Chat(ctx context.Context, request ChatRequest) (*ChatResponse, 
 
 	response.TokenUsage = response.TokenUsage.Normalize()
 
-	if strings.TrimSpace(response.ResponseText()) == "" {
-		return nil, errors.New("ai runtime chat response text is empty")
+	if strings.TrimSpace(response.ResponseText()) == "" && !response.HasToolCalls() {
+		return nil, errors.New("ai runtime chat response text and tool_calls are empty")
 	}
 
 	return &response, nil
