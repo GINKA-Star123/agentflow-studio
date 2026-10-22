@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "agentflow-api"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "api:8080"
+
+  - job_name: "agentflow-ai-runtime"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets:
+          - "ai-runtime:8090"
