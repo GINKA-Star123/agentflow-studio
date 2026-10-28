@@ -1,0 +1,15 @@
+tmp
+bin
+dist
+coverage
+
+.env
+.env.local
+
+.git
+.gitignore
+Dockerfile
+.dockerignore
+
+*.test
+*.out
