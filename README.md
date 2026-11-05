@@ -1,5 +1,140 @@
 # AgentFlow Studio
 
+**面向 AI Agent 的可视化 Workflow 编排平台** —— 拖拽编排 → DAG 校验 → 节点调度 → 模型调用 → 流式回显 → 全链路可观测。
+
+> 一个可本地一键运行、带完整可观测性与单元测试的 AI Agent 编排引擎实现，用于展示「前端编排 + 后端执行 + AI 运行时 + 云原生部署」的端到端工程能力。
+
+![Go](https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-Python-009688?logo=fastapi&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker%20Compose-10%20services-2496ED?logo=docker&logoColor=white)
+
+---
+
+## 一、架构总览
+
+```mermaid
+flowchart TB
+  subgraph Web["前端 apps/web · Next.js + React Flow"]
+    Canvas["可视化编排画布<br/>节点拖拽 / 连线 / 属性面板"]
+    RunView["运行态视图<br/>SSE 流式 token 渲染"]
+  end
+
+  subgraph API["Go API services/api · Gin + GORM"]
+    Auth["JWT 鉴权<br/>RBAC 权限中间件"]
+    WF["Workflow CRUD<br/>Schema 版本管理"]
+    DAG["DAG 校验<br/>环检测 / 连通性 / 必填参数"]
+    Node["节点执行器注册表<br/>Start / Prompt / LLM / Tool / Code / Knowledge"]
+    Sched["Run 调度<br/>状态持久化 / 失败回放"]
+  end
+
+  subgraph RT["AI Runtime services/ai-runtime · FastAPI"]
+    Provider["OpenAI Compatible Provider<br/>多模型参数归一化 / 超时重试"]
+    ToolCall["Tool Calling<br/>JSON Schema 描述 → 调用 → 结果归一化"]
+  end
+
+  PG[("PostgreSQL<br/>用户 / 工作流 / 运行记录")]
+  Redis[("Redis<br/>会话 / 限流")]
+  Qdrant[("Qdrant<br/>知识库向量")]
+  LLM["OpenAI / DeepSeek / Qwen"]
+  Obs["Prometheus · Grafana · Jaeger"]
+
+  Canvas -->|REST| Auth --> WF --> DAG --> Node --> Sched
+  Sched -->|HTTP + SSE| Provider --> LLM
+  Sched --> ToolCall
+  WF --> PG
+  Sched --> PG
+  Auth --> Redis
+  ToolCall --> Qdrant
+  API -.埋点.-> Obs
+  RT -.埋点.-> Obs
+```
+
+## 二、核心能力
+
+| 模块 | 说明 |
+| --- | --- |
+| 可视化编排 | React Flow 画布，节点拖拽 / 连线校验 / 属性面板动态表单，输出可执行 DAG Schema |
+| DAG 校验 | 提交阶段做环检测、连通性、必填参数校验，非法工作流不进执行队列 |
+| 节点体系 | 节点执行器注册表，6 类节点（Start / Prompt / LLM / Tool / Code / Knowledge）插件化注册 |
+| AI Runtime | 统一多模型接入层，参数规范、超时重试、错误归一化、SSE 流式输出 |
+| Tool Calling | JSON Schema 描述工具，串联「调用 → 参数校验 → 结果回填 → 归一化」 |
+| 知识库 / RAG | 文档解析、切块、向量化，Qdrant 检索后注入上下文 |
+| 多租户与权限 | JWT 鉴权 + Workspace 成员隔离 + RBAC 角色权限 |
+| 可观测性 | Prometheus 指标、Grafana 面板、Jaeger 链路追踪，运行轨迹可回放 |
+
+## 三、技术栈
+
+| 层 | 技术 |
+| --- | --- |
+| 前端 | Next.js 16 · React 19 · TypeScript · TailwindCSS · React Flow · Zustand · TanStack Query |
+| Go API | Go · Gin · GORM · JWT · Redis · Zap · Viper |
+| AI Runtime | Python · FastAPI · Pydantic · SSE · OpenAI Compatible SDK |
+| 存储 | PostgreSQL · Redis · Qdrant |
+| 可观测 | Prometheus · Grafana · Jaeger |
+| 部署 | Docker · Docker Compose（10 服务）· Nginx |
+
+## 四、快速开始
+
+```bash
+git clone https://github.com/GINKA-Star123/agentflow-studio.git
+cd agentflow-studio
+cp .env.example .env
+
+# 一条命令拉起 Web / Go API / AI Runtime / PostgreSQL / Redis / Qdrant / Nginx / Prometheus / Grafana / Jaeger
+docker compose up -d
+
+# 健康检查
+curl http://localhost:8080/api/v1/health
+```
+
+访问 http://localhost:3000 打开编排画布。
+
+## 五、仓库结构
+
+```text
+agentflow-studio/
+├── apps/web/               # Next.js 前端：编排画布、工作台、运行态视图
+├── services/api/           # Go 服务：鉴权、Workflow、DAG 校验、节点调度
+│   ├── cmd/                # 启动入口
+│   ├── internal/           # auth / workspace / workflow / engine / handler
+│   └── migrations/         # 数据库迁移
+├── services/ai-runtime/    # Python FastAPI：多模型接入、Tool Calling、流式输出
+├── deployments/docker/     # Prometheus / Grafana / Jaeger 配置
+├── docs/                   # 架构、API、数据库、可观测性设计文档
+└── scripts/                # 本地开发、健康检查、容器编排脚本
+```
+
+## 六、可观测性
+
+- **指标**：Go API 与 AI Runtime 暴露 Prometheus 指标（请求量、延迟、错误率、token_usage）
+- **链路**：Jaeger 追踪一次 Workflow Run 的完整调用链，定位到具体节点
+- **看板**：Grafana 预置面板，查看 P95 延迟与失败率
+- **回放**：运行记录持久化节点状态，失败 Run 可按轨迹逐步回放
+
+## 七、测试
+
+- Go 侧 **205 个测试函数**，覆盖鉴权、密码、DAG 校验、节点调度与错误分支
+- Python 侧覆盖接口、知识库解析与工具调用
+- 全部用例可离线运行，不依赖真实模型 API
+
+## 八、设计文档
+
+| 文档 | 内容 |
+| --- | --- |
+| [SYSTEM_ARCHITECTURE.md](docs/SYSTEM_ARCHITECTURE.md) | 系统分层与模块边界 |
+| [WORKFLOW_ENGINE.md](docs/WORKFLOW_ENGINE.md) | DAG 执行与节点调度设计 |
+| [AI_RUNTIME.md](docs/AI_RUNTIME.md) | 模型接入层与 Tool Calling |
+| [DATABASE_DESIGN.md](docs/DATABASE_DESIGN.md) | 数据模型与表结构 |
+| [OBSERVABILITY.md](docs/OBSERVABILITY.md) | 指标、链路与告警设计 |
+| [API_DESIGN.md](docs/API_DESIGN.md) | 接口规范与错误码 |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | 部署与运维 |
+
+---
+
+<details>
+<summary>📜 开发阶段记录（Phase 1–5，点击展开）</summary>
+
 AgentFlow Studio 是一个面向 AI Agent 的生产级可视化 Workflow 编排平台。
 
 当前阶段：Phase 5 AI Runtime / Tools / Streaming 已完成，准备进入 Phase 6 Knowledge Base。
@@ -7,6 +142,8 @@ AgentFlow Studio 是一个面向 AI Agent 的生产级可视化 Workflow 编排�
 Phase 1 的目标是完成基础工程、基础服务、Docker 编排、健康检查和本地开发流程，为后续用户系统、Workflow Designer、Workflow Engine、AI Runtime、RAG、Redis、OpenTelemetry、MCP 等阶段打基础。
 
 Phase 2 的目标是完成用户注册、用户登录、JWT 签发与校验、当前用户接口、Workspace 创建、Workspace 成员关系、Workspace 权限校验和基础 RBAC 行为。
+
+</details>
 
 ## 1. 项目定位
 
